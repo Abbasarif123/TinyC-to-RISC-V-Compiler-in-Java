@@ -1,0 +1,24 @@
+{
+    "java.test.config" : {
+        "env": {
+            "PATH" : "${workspaceFolder}/libs/",
+            "LD_LIBRARY_PATH" : "${workspaceFolder}/libs/",
+            "DYLD_LIBRARY_PATH" : "${workspaceFolder}/libs/"
+        } // to link with z3
+    },
+    "editor.formatOnSave": true,
+    "java.configuration.runtimes": [
+        {
+            "path": "/usr/lib/jvm/java-21-openjdk/",
+            "name": "JavaSE-17",
+            "default": true
+        },
+        {
+            "path": "/usr/lib/jvm/java-21-openjdk/",
+            "name": "JavaSE-21"
+        }
+    ],
+    "vim.textwidth": 120,
+    "java.format.settings.url": "eclipse-formatter.xml",
+    "java.compile.nullAnalysis.mode": "automatic"
+}

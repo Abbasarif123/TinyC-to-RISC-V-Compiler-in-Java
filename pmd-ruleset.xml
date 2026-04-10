@@ -1,0 +1,58 @@
+<?xml version="1.0"?>
+<ruleset name="Custom Rules"
+    xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+    <description>
+        Custom ruleset for MonRogue project
+    </description>
+
+    <!-- Include all rules by default -->
+    <rule ref="category/java/bestpractices.xml">
+        <!-- Disable logger guard warnings -->
+        <exclude name="GuardLogStatement" />
+        <exclude name="AbstractClassWithoutAbstractMethod" />
+        <exclude name="OneDeclarationPerLine" />
+        <exclude name="JUnitTestsShouldIncludeAssert" />
+    </rule>
+    <rule ref="category/java/codestyle.xml">
+        <!-- Exclude overly strict naming conventions -->
+        <exclude name="ShortVariable" />
+        <exclude name="ShortClassName" />
+        <exclude name="LongVariable" />
+        <exclude name="OnlyOneReturn" />
+        <exclude name="AtLeastOneConstructor" />
+        <exclude name="LocalVariableCouldBeConst" />
+        <exclude name="MethodArgumentCouldBeFinal" />
+        <exclude name="FieldDeclarationsShouldBeAtStartOfClass" />
+        <exclude name="LocalVariableCouldBeFinal" />
+        <exclude name="EmptyMethodInAbstractClassShouldBeAbstract" />
+        <exclude name="ShortMethodName" />
+    </rule>
+    <rule ref="category/java/design.xml">
+        <exclude name="AbstractClassWithoutAnyMethod" />
+        <exclude name="DataClass" />
+        <exclude name="ExcessivePublicCount" />
+        <exclude name="TooManyFields" />
+        <exclude name="TooManyMethods" />
+        <exclude name="GodClass" />
+        <exclude name="ExcessiveImports" />
+        <exclude name="ExcessiveParameterList" />
+        <exclude name="CouplingBetweenObjects" />
+        <exclude name="FinalFieldCouldBeStatic" />
+    </rule>
+    <rule ref="category/java/documentation.xml">
+        <exclude name="CommentRequired" />
+        <exclude name="CommentSize" />
+    </rule>
+    <!-- <rule ref="category/java/errorprone.xml">
+        <exclude name="AvoidLiteralsInIfCondition" />
+        <exclude name="AvoidDuplicateLiterals" />
+    </rule> -->
+    <rule ref="category/java/multithreading.xml" />
+    <rule ref="category/java/performance.xml">
+        <exclude name="AvoidInstantiatingObjectsInLoops" />
+    </rule>
+    <rule ref="category/java/security.xml" />
+</ruleset> 
