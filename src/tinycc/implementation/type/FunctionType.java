@@ -28,4 +28,13 @@ public class FunctionType extends Type {
         return sb.toString();
 
     }
+
+    // getters
+    public Type getReturnType() {
+        return returnType;
+    }
+
+    public List<Type> getParameters() {
+        return parameters;
+    }
 }
