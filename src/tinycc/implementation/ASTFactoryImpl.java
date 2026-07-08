@@ -5,6 +5,8 @@ import tinycc.diagnostic.Locatable;
 import tinycc.parser.ASTFactory;
 import tinycc.parser.Token;
 import tinycc.parser.TokenKind;
+import tinycc.implementation.declaration.ExternalDeclaration;
+import tinycc.implementation.declaration.FunctionDefinition;
 import tinycc.implementation.expression.BinaryExpression;
 import tinycc.implementation.expression.CallExpression;
 import tinycc.implementation.expression.ConditionalExpression;
@@ -25,7 +27,7 @@ import tinycc.implementation.type.PointerType;
 
 public class ASTFactoryImpl implements ASTFactory {
     // this list acts as the root of the AST, storing all global functions and variables
-    private List<Object> externalDeclarations = new java.util.ArrayList<>();
+    private List<Object> programRoots = new java.util.ArrayList<>(); // its like a ledger for our C program
 
     @Override
     public Type createBaseType(TokenKind kind) {
@@ -154,7 +156,7 @@ public class ASTFactoryImpl implements ASTFactory {
 
         // a global variable or function signature (eg int global_var or void foo(int))
         // Store the data for phase 2
-        externalDeclarations.add(new Object[] { "ExternalDecl", type, name });
+        programRoots.add(new ExternalDeclaration(type, name));
 
     }
 
@@ -164,7 +166,12 @@ public class ASTFactoryImpl implements ASTFactory {
         // throw new UnsupportedOperationException("Unimplemented method 'createFunctionDefinition'");
 
         // a complete function with a body (eg int main() { return 0 })
-        externalDeclarations.add(new Object[] { "FuncDef", type, name, parameterNames, body });
+        programRoots.add(new FunctionDefinition(type, name, parameterNames, body));
+
+    }
+
+    public List<Object> getProgramRoots() {
+        return programRoots;
     }
 
 }

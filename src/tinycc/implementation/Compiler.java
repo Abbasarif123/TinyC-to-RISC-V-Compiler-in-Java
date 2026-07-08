@@ -6,6 +6,8 @@ import tinycc.parser.Lexer;
 import tinycc.parser.Parser;
 import tinycc.logic.Formula;
 import tinycc.asmgen.AsmGen;
+import tinycc.implementation.semantics.SemanticAnalyzer;
+import tinycc.implementation.semantics.SymbolTable;
 
 /**
  * The main compiler class.
@@ -64,7 +66,15 @@ public class Compiler {
 	 *          invoked only once in each instance of the compiler class.
 	 */
 	public void checkSemantics() {
-		throw new UnsupportedOperationException("TODO: implement this");
+		// throw new UnsupportedOperationException("Done: implement this");
+
+		// get the AST
+		ASTFactoryImpl myFactory = (ASTFactoryImpl) this.getASTFactory();
+		java.util.List<Object> astRoots = myFactory.getProgramRoots();
+
+		// bootup the analyzer and start traversubg the tree
+		SemanticAnalyzer analyzer = new SemanticAnalyzer(this.diagnostic);
+		analyzer.analyze(astRoots);
 	}
 
 	/**
