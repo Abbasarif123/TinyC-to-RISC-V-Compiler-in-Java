@@ -18,6 +18,7 @@ import tinycc.asmgen.AsmGen;
 public class Compiler {
 
 	Diagnostic diagnostic;
+	private ASTFactory factory; // addition
 
 	/**
 	 * Initializes the compiler class with the given diagnostic module
@@ -27,6 +28,7 @@ public class Compiler {
 	 */
 	public Compiler(final Diagnostic diagnostic) {
 		this.diagnostic = diagnostic;
+		this.factory = new ASTFactoryImpl(); // initialized
 	}
 
 	/**
@@ -36,7 +38,8 @@ public class Compiler {
 	 * @see ASTFactory
 	 */
 	public ASTFactory getASTFactory() {
-		throw new UnsupportedOperationException("TODO: implement this");
+		// throw new UnsupportedOperationException("DONE: implement this");
+		return this.factory; // returning the cached instance
 	}
 
 	/**
