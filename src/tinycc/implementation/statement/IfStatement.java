@@ -29,4 +29,17 @@ public class IfStatement extends Statement {
         }
     }
 
+    // getters
+    public Expression getCondition() {
+        return condition;
+    }
+
+    public Statement getConsequence() {
+        return consequence;
+    }
+
+    public Statement getAlternative() {
+        return alternative;
+    }
+
 }

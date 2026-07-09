@@ -17,4 +17,9 @@ public class ExpressionStatement extends Statement {
         // from PDF --> "Expression statements have exactly the same abstract syntax as their expression."
         return expression.toString();
     }
+
+    // getters
+    public Expression getExpression() {
+        return expression;
+    }
 }

@@ -12,10 +12,12 @@ import tinycc.implementation.type.Type;
 public class SemanticAnalyzer {
     private SymbolTable symbolTable;
     private Diagnostic diagnostic; // this is gonna be used to emit errors
+    private Type currentFunctionReturnType;
 
     public SemanticAnalyzer(Diagnostic diagnostic) {
         this.symbolTable = new SymbolTable();
         this.diagnostic = diagnostic;
+
     }
 
     public void analyze(List<Object> programRoots) {
@@ -97,6 +99,15 @@ public class SemanticAnalyzer {
         checkStatement(func.getBody());
 
         symbolTable.leaveScope();
+        this.currentFunctionReturnType = funcType.getReturnType();
+
+        // recursivelt walk through the func.getBody() and check the statements
+        checkStatement(func.getBody());
+
+        // kiill it when the function ends
+        this.currentFunctionReturnType = null;
+
+        symbolTable.leaveScope();
     }
 
     // recursively walks through statments and checks their semantics
@@ -158,19 +169,72 @@ public class SemanticAnalyzer {
             }
 
         } else if (stmt instanceof tinycc.implementation.statement.ExpressionStatement) {
-            // TODO: check standalone expressions
+            // DONE: check standalone expressions
+            tinycc.implementation.statement.ExpressionStatement exprStmt = (tinycc.implementation.statement.ExpressionStatement) stmt;
+            // just check it to find any errors in this standalone expression
+            checkExpression(exprStmt.getExpression());
+
         } else if (stmt instanceof tinycc.implementation.statement.ReturnStatement) {
             // DONE: check return types
+            // DONE: Verify the returned expression matches the function's return type
+
             tinycc.implementation.statement.ReturnStatement ret = (tinycc.implementation.statement.ReturnStatement) stmt;
 
             if (ret.getExpression() != null) {
-                checkExpression(ret.getExpression());
-                // TODO: Verify the returned expression matches the function's return type
+                Type actualRetType = checkExpression(ret.getExpression());
+
+                // compare the actual returned type to the function's expected return type
+                if (currentFunctionReturnType != null && actualRetType != null) {
+                    if (!actualRetType.toString().equals(currentFunctionReturnType.toString())) {
+
+                        // Allow implicit char -> int conversion
+                        boolean isImplicitCharToInt = currentFunctionReturnType.toString().equals("Type_int")
+                                && actualRetType.toString().equals("Type_char");
+
+                        if (!isImplicitCharToInt) {
+                            diagnostic.printError(null, "Return type mismatch. Expected "
+                                    + currentFunctionReturnType.toString() + " but got " + actualRetType.toString());
+                        }
+                    }
+                }
+            } else {
+                // handle empty return
+                if (currentFunctionReturnType != null && !currentFunctionReturnType.toString().equals("Type_void")) {
+                    diagnostic.printError(null, "Missing return value. Function is expected to return "
+                            + currentFunctionReturnType.toString());
+                }
             }
         } else if (stmt instanceof tinycc.implementation.statement.IfStatement) {
-            // TODO: check conditions
+            // DONE: check conditions
+            tinycc.implementation.statement.IfStatement ifStmt = (tinycc.implementation.statement.IfStatement) stmt;
+
+            // check the condition
+            Type condType = checkExpression(ifStmt.getCondition());
+            if (condType != null && condType.toString().equals("Type_void")) {
+                // check if its void ie if it aint null then see if it returns void
+                diagnostic.printError(null, "Condition in 'if' statement cannot be void.");
+            }
+
+            // recursively check the if then block
+            checkStatement(ifStmt.getConsequence());
+
+            // recursively check the 'else' block (if it exists)
+            if (ifStmt.getAlternative() != null) {
+                checkStatement(ifStmt.getAlternative());
+            }
+
         } else if (stmt instanceof tinycc.implementation.statement.WhileStatement) {
-            // TODO: check loops
+            // Done: check loops
+            tinycc.implementation.statement.WhileStatement whileStmt = (tinycc.implementation.statement.WhileStatement) stmt;
+
+            // check the condition
+            Type condType = checkExpression(whileStmt.getCondition());
+            if (condType != null && condType.toString().equals("Type_void")) {
+                diagnostic.printError(null, "Condition in 'while' statement cannot be void.");
+            }
+
+            // recursively check the loop body
+            checkStatement(whileStmt.getBody());
         } else {
             throw new UnsupportedOperationException("Unknown statement type: " + stmt.getClass().getSimpleName());
         }

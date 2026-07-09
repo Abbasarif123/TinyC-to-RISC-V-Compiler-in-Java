@@ -19,4 +19,13 @@ public class WhileStatement extends Statement {
     public String toString() {
         return "While[" + condition.toString() + ", " + body.toString() + "]";
     }
+
+    // getters
+    public Expression getCondition() {
+        return condition;
+    }
+
+    public Statement getBody() {
+        return body;
+    }
 }
