@@ -20,4 +20,13 @@ public class UnaryExpression extends Expression {
         // eg --> &x': Unary_&[Var_x]
         return "Unary_" + operator.getText() + "[" + operand.toString() + "]";
     }
+
+    // getter
+    public tinycc.parser.Token getOperator() {
+        return operator;
+    }
+
+    public Expression getOperand() {
+        return operand;
+    }
 }

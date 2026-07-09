@@ -1,5 +1,6 @@
 package tinycc.implementation.semantics;
 
+import tinycc.implementation.expression.Expression;
 import java.util.List;
 import tinycc.diagnostic.Diagnostic;
 import tinycc.implementation.declaration.ExternalDeclaration;
@@ -92,9 +93,318 @@ public class SemanticAnalyzer {
             }
         }
 
-        // TODO: recursively walk through the func.getbody() and check statements
+        // DOne: recursively walk through the func.getbody() and check statements
+        checkStatement(func.getBody());
 
         symbolTable.leaveScope();
+    }
+
+    // recursively walks through statments and checks their semantics
+    private void checkStatement(tinycc.implementation.statement.Statement stmt) {
+        if (stmt == null) {
+            return;
+        }
+
+        if (stmt instanceof tinycc.implementation.statement.BlockStatement) { // check for block statement
+            tinycc.implementation.statement.BlockStatement block = (tinycc.implementation.statement.BlockStatement) stmt;
+            // true so its a block
+
+            symbolTable.enterScope(); // a new local scope is declared
+
+            // recursively check every statement inside this block
+            for (tinycc.implementation.statement.Statement innerStmt : block.getStatements()) {
+                checkStatement(innerStmt);
+            }
+
+            symbolTable.leaveScope(); // leave scope ie destroy it when the block ends
+
+        }
+        // now check for different rules
+        else if (stmt instanceof tinycc.implementation.statement.DeclarationStatement) {
+            // DONE: check for local var decl
+            tinycc.implementation.statement.DeclarationStatement decl = (tinycc.implementation.statement.DeclarationStatement) stmt;
+
+            // rule: loacl variable cannot be of void type
+            if (decl.getType().toString().equals("Type_void")) {
+                diagnostic.printError(decl.getName(), "Variable cannot be of type void.");
+                return;
+            }
+
+            // now attempt add it to a local scope
+            boolean success = symbolTable.insert(decl.getName().getText(), decl.getType());
+            if (!success) {
+                // Rule: Cannot declare two variables with the same name in the EXACT same scope
+                diagnostic.printError(decl.getName(),
+                        "Variable '" + decl.getName().getText() + "' is already declared in this scope.");
+            }
+
+            // if there is an initialization, we need to type check that
+            if (decl.getInit() != null) {
+                Type initType = checkExpression(decl.getInit());
+                // DONE: Verify that the type of decl.getInit() matches decl.getType()
+
+                // strict exact math check for now
+                if (initType != null && !initType.toString().equals(decl.getType().toString())) {
+                    // implicit char to int
+                    boolean isImplicitCharToInt = decl.getType().toString().equals("Type_int")
+                            && initType.toString().equals("Type_char");
+
+                    if (!isImplicitCharToInt) {
+                        diagnostic.printError(decl.getName(), "Type mismatch in declaration. Expected "
+                                + decl.getType().toString() + " but got " + initType.toString());
+                    }
+
+                }
+            }
+
+        } else if (stmt instanceof tinycc.implementation.statement.ExpressionStatement) {
+            // TODO: check standalone expressions
+        } else if (stmt instanceof tinycc.implementation.statement.ReturnStatement) {
+            // DONE: check return types
+            tinycc.implementation.statement.ReturnStatement ret = (tinycc.implementation.statement.ReturnStatement) stmt;
+
+            if (ret.getExpression() != null) {
+                checkExpression(ret.getExpression());
+                // TODO: Verify the returned expression matches the function's return type
+            }
+        } else if (stmt instanceof tinycc.implementation.statement.IfStatement) {
+            // TODO: check conditions
+        } else if (stmt instanceof tinycc.implementation.statement.WhileStatement) {
+            // TODO: check loops
+        } else {
+            throw new UnsupportedOperationException("Unknown statement type: " + stmt.getClass().getSimpleName());
+        }
+    }
+
+    // recursively evaluate an expression and return its type
+    private Type checkExpression(tinycc.implementation.expression.Expression expr) {
+        if (expr == null) {
+            return null;
+        }
+
+        if (expr instanceof tinycc.implementation.expression.PrimaryExpression) {
+            tinycc.implementation.expression.PrimaryExpression primary = (tinycc.implementation.expression.PrimaryExpression) expr;
+            tinycc.parser.Token token = primary.getToken();
+
+            // is it a variable,so check memory
+            if (token.getKind() == tinycc.parser.TokenKind.IDENTIFIER) {
+                Type declaredType = symbolTable.lookup(token.getText());
+                if (declaredType == null) {
+                    diagnostic.printError(token, "Undeclared variable: '" + token.getText() + "'");
+                    // return a dummy type to prevent a crash by the compilor on cascading errors
+                    return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+                }
+                return declaredType;
+            }
+
+            // is it a number or char, then the tyoe is int
+            else if (token.getKind() == tinycc.parser.TokenKind.NUMBER
+                    || token.getKind() == tinycc.parser.TokenKind.CHARACTER) {
+                return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+            }
+            // is it a string literal the type is char*
+            else if (token.getKind() == tinycc.parser.TokenKind.STRING) {
+                tinycc.implementation.type.BaseType charType = new tinycc.implementation.type.BaseType(
+                        tinycc.parser.TokenKind.CHAR);
+                return new tinycc.implementation.type.PointerType(charType);
+            }
+        }
+
+        else if (expr instanceof tinycc.implementation.expression.BinaryExpression) {
+            // DONE:handle math assignments
+            tinycc.implementation.expression.BinaryExpression binOp = (tinycc.implementation.expression.BinaryExpression) expr;
+
+            // recursively find the types on the left and right sides
+            Type leftType = checkExpression(binOp.getLeft());
+            Type rightType = checkExpression(binOp.getRight());
+            tinycc.parser.Token operator = binOp.getOperator();
+
+            if (leftType == null || rightType == null) {
+                return null; // error prevention
+            }
+
+            // dealing with = (assignment)
+            if (operator.getKind() == tinycc.parser.TokenKind.EQUAL) {
+                // rule left side must be an assignable location L evaluable
+                // Done: verify binOp.getLeft() is an Lvalue (like a variable or dereferenced pointer)
+
+                // now we enforce the Lvalue rule
+                if (!isLValue(binOp.getLeft())) {
+                    diagnostic.printError(operator,
+                            "Left side of assignment must be a variable or a dereferenced pointer.");
+                }
+
+                // check type compatibility (allowing implicit char to int conversion)
+                if (!leftType.toString().equals(rightType.toString())) {
+                    boolean isImplicitCharToInt = leftType.toString().equals("Type_int")
+                            && rightType.toString().equals("Type_char");
+                    if (!isImplicitCharToInt) {
+                        diagnostic.printError(operator,
+                                "Type mismatch in assignment. Cannot assign " + rightType + " to " + leftType);
+                    }
+                }
+                return leftType; // Assignments return the type of their left operand
+            }
+
+            // handle math (+)
+            else if (operator.getKind() == tinycc.parser.TokenKind.PLUS) {
+                // int + int = int ie normal addition
+                if (leftType.toString().equals("Type_int") && rightType.toString().equals("Type_int")) {
+                    return leftType;
+                }
+                // pointer + int = pointer ie pointer artihmetic
+                else if (leftType instanceof tinycc.implementation.type.PointerType
+                        && rightType.toString().equals("Type_int")) {
+                    return leftType;
+                }
+                // int + pointer = pointer ie pointer arithemetic but the ther way around
+                else if (leftType.toString().equals("Type_int")
+                        && rightType instanceof tinycc.implementation.type.PointerType) {
+                    return rightType;
+                } else {
+                    diagnostic.printError(operator, "Invalid types for addition: " + leftType + " and " + rightType);
+                    return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+                }
+            }
+
+            // handle comparison operatorrs (eg ==, < , >)
+            else if (operator.getKind() == tinycc.parser.TokenKind.EQUAL_EQUAL
+                    || operator.getKind() == tinycc.parser.TokenKind.LESS) {
+                // comparisons always evaluate to an integer (0 for false, 1 for true)
+                return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+            }
+            // fallback for other operators (maybe check this for later)
+            return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+
+        } else if (expr instanceof tinycc.implementation.expression.CallExpression) {
+            tinycc.implementation.expression.CallExpression call = (tinycc.implementation.expression.CallExpression) expr;
+
+            // get the function name ie callee
+            Expression calleeExpr = call.getCallee();
+            if (!(calleeExpr instanceof tinycc.implementation.expression.PrimaryExpression)) {
+                diagnostic.printError(call.getToken(), "Invalid function call format.");
+                return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT); // fallback
+            }
+
+            tinycc.parser.Token funcToken = ((tinycc.implementation.expression.PrimaryExpression) calleeExpr)
+                    .getToken();
+            String funcName = funcToken.getText();
+
+            // look up the function in the lookup table
+            Type funcType = symbolTable.lookup(funcName);
+            if (funcType == null) {
+                diagnostic.printError(funcToken, "Call to undeclared function: '" + funcName + "'");
+                return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+            }
+
+            // verify for safety that its a function
+            if (!(funcType instanceof tinycc.implementation.type.FunctionType)) {
+                diagnostic.printError(funcToken, "Called object '" + funcName + "' is not a function.");
+                return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+            }
+
+            tinycc.implementation.type.FunctionType fType = (tinycc.implementation.type.FunctionType) funcType;
+
+            // check if the argument count matches up with the parameter count
+            List<Expression> args = call.getArguments();
+            List<Type> params = fType.getParameters();
+            if (args.size() != params.size()) {
+                diagnostic.printError(funcToken,
+                        "Function '" + funcName + "' expects " + params.size() + " arguments, but got " + args.size());
+            } else {
+                // verify the type of every argument, make sure it matches
+                for (int i = 0; i < args.size(); i++) {
+                    Type argType = checkExpression(args.get(i));
+                    Type paramType = params.get(i);
+
+                    if (argType != null && !argType.toString().equals(paramType.toString())) {
+                        // Allow implicit char -> int promotion
+                        boolean isImplicitCharToInt = paramType.toString().equals("Type_int")
+                                && argType.toString().equals("Type_char");
+                        if (!isImplicitCharToInt) {
+                            diagnostic.printError(funcToken, "Argument " + (i + 1) + " type mismatch. Expected "
+                                    + paramType + " but got " + argType);
+                        }
+                    }
+                }
+            }
+            // a function call will evaluate to its return type
+            return fType.getReturnType();
+
+        }
+        // for unary operations
+        else if (expr instanceof tinycc.implementation.expression.UnaryExpression) {
+            tinycc.implementation.expression.UnaryExpression unary = (tinycc.implementation.expression.UnaryExpression) expr;
+            tinycc.parser.Token operator = unary.getOperator();
+
+            // get the type of the single operand
+            Type operandType = checkExpression(unary.getOperand());
+            if (operandType == null) {
+                return null;
+            }
+
+            // Addressof operator ie &, this creates a pointer
+            if (operator.getText().equals("&")) {
+                // rule:can only take the address of an lvalue (a specific memory location)
+                if (!isLValue(unary.getOperand())) {
+                    diagnostic.printError(operator, "Cannot take the address of a non-LValue.");
+                    return new tinycc.implementation.type.PointerType(operandType); // return anyway to prevent
+                                                                                    // cascading errors
+                }
+                // taking the address of an 'int' gives you an 'int*'
+                return new tinycc.implementation.type.PointerType(operandType);
+            }
+
+            // dereference operator ie *
+            else if (operator.getText().equals("*")) {
+                // rule: you can only dereference a pointer type
+                if (!(operandType instanceof tinycc.implementation.type.PointerType)) {
+                    diagnostic.printError(operator, "Cannot dereference a non-pointer type: " + operandType);
+                    return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+                }
+                // dereferencing an 'int*' gives you the underlying 'int'
+                tinycc.implementation.type.PointerType ptrType = (tinycc.implementation.type.PointerType) operandType;
+                return ptrType.getPointsTo();
+            }
+
+            // math or logic operators which will always return int
+            else if (operator.getText().equals("-") || operator.getText().equals("!")) {
+                return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+            }
+
+            // fall back for sizeof and stuff (if its supported by tinyC will check later)
+            return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+
+        }
+        // fallback for unimplemented expressions
+        return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
+
+    }
+
+    // helper
+    // determines if an expression is a valid L-value (can be assigned to)
+    private boolean isLValue(tinycc.implementation.expression.Expression expr) {
+        if (expr == null) {
+            return false;
+        }
+
+        // check if its a variable
+        if (expr instanceof tinycc.implementation.expression.PrimaryExpression) {
+            tinycc.implementation.expression.PrimaryExpression primary = (tinycc.implementation.expression.PrimaryExpression) expr;
+            // it is only an lvalue if the primary expression is an identifier (variable name)
+            return primary.getToken().getKind() == tinycc.parser.TokenKind.IDENTIFIER;
+        }
+
+        // check if itsa dereferenced pointer like *p = 2
+        else if (expr instanceof tinycc.implementation.expression.UnaryExpression) {
+            tinycc.implementation.expression.UnaryExpression unary = (tinycc.implementation.expression.UnaryExpression) expr;
+            // check if the unary operator is a *
+            return unary.getOperator().getText().equals("*");
+        }
+
+        // numbers strings math eqs and func calls are not lvalues since not Levalable
+        return false;
+
     }
 
 }

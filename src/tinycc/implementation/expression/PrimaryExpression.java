@@ -24,4 +24,9 @@ public class PrimaryExpression extends Expression {
 
     }
 
+    // getter
+    public tinycc.parser.Token getToken() {
+        return token;
+    }
+
 }

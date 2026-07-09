@@ -32,4 +32,9 @@ public class BlockStatement extends Statement {
         sb.append("]");
         return sb.toString();
     }
+
+    // getter
+    public List<Statement> getStatements() {
+        return statements;
+    }
 }

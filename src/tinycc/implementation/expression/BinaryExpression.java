@@ -21,4 +21,17 @@ public class BinaryExpression extends Expression {
         return "Binary_" + operator.getText() + "[" + left.toString() + ", " + right.toString() + "]";
     }
 
+    // getters
+    public tinycc.parser.Token getOperator() {
+        return operator;
+    }
+
+    public Expression getLeft() {
+        return left;
+    }
+
+    public Expression getRight() {
+        return right;
+    }
+
 }

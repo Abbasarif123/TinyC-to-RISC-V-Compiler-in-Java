@@ -14,4 +14,9 @@ public class PointerType extends Type {
         // we need Pointer[innerType]
         return "Pointer[" + pointsTo.toString() + "]";
     }
+
+    // getters
+    public Type getPointsTo() {
+        return this.pointsTo;
+    }
 }

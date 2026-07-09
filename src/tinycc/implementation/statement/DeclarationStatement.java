@@ -30,4 +30,17 @@ public class DeclarationStatement extends Statement {
         return sb.toString();
 
     }
+
+    // getters
+    public Type getType() {
+        return type;
+    }
+
+    public tinycc.parser.Token getName() {
+        return name;
+    }
+
+    public Expression getInit() {
+        return init;
+    }
 }

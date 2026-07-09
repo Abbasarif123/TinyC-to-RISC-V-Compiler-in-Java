@@ -32,4 +32,17 @@ public class CallExpression extends Expression {
         return sb.toString();
     }
 
+    // getters //extraction of the line number for error reporting
+    public tinycc.parser.Token getToken() {
+        return token;
+    }
+
+    public Expression getCallee() {
+        return callee;
+    }
+
+    public List<Expression> getArguments() {
+        return arguments;
+    }
+
 }

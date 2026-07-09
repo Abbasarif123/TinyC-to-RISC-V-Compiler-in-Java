@@ -22,4 +22,9 @@ public class ReturnStatement extends Statement {
         }
 
     }
+
+    // getter
+    public Expression getExpression() {
+        return expression;
+    }
 }
