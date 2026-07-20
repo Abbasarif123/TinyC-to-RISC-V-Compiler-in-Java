@@ -38,13 +38,13 @@ public class CodeGenerator {
         out.emitLabel(funcLabel);
 
         // set up the stack frame (storing)
-        // allocate 32 bytes on the stack
-        out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.SP, GPRegister.SP, -32);
-        // save ra and frame poointer s0
-        out.emitInstruction(MemoryInstruction.SW, GPRegister.RA, null, 28, GPRegister.SP);
-        out.emitInstruction(MemoryInstruction.SW, GPRegister.S0, null, 24, GPRegister.SP);
-        // new frame pointer
-        out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.S0, GPRegister.SP, 32);
+        // allocate 128 bytes on the stack for plenty of local variable space
+        out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.SP, GPRegister.SP, -128);
+        // save ra and frame poointer s0 at the very top of the new frame
+        out.emitInstruction(MemoryInstruction.SW, GPRegister.RA, null, 124, GPRegister.SP);
+        out.emitInstruction(MemoryInstruction.SW, GPRegister.S0, null, 120, GPRegister.SP);
+        // new frame pointer points to the top of the frame
+        out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.S0, GPRegister.SP, 128);
 
         // create new epilogue label after func so u know where tojump
         currentEpilogueLabel = out.makeUniqueTextLabel("epilogue_" + funcName);
@@ -67,10 +67,10 @@ public class CodeGenerator {
         out.emitLabel(currentEpilogueLabel);
 
         // restore ra and fp
-        out.emitInstruction(MemoryInstruction.LW, GPRegister.RA, null, 28, GPRegister.SP);
-        out.emitInstruction(MemoryInstruction.LW, GPRegister.S0, null, 24, GPRegister.SP);
+        out.emitInstruction(MemoryInstruction.LW, GPRegister.RA, null, 124, GPRegister.SP);
+        out.emitInstruction(MemoryInstruction.LW, GPRegister.S0, null, 120, GPRegister.SP);
         // deallocate stack
-        out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.SP, GPRegister.SP, 32);
+        out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.SP, GPRegister.SP, 128);
         // returnto caller
         out.emitInstruction(JumpRegisterInstruction.JR, GPRegister.RA);
 
@@ -296,6 +296,16 @@ public class CodeGenerator {
                 generateExpression(unary.getOperand());
                 // load the actual value from that address
                 out.emitInstruction(MemoryInstruction.LW, GPRegister.A0, null, 0, GPRegister.A0);
+            } else if (op.getText().equals("-")) {
+                // evaluate the operand (result in a0)
+                generateExpression(unary.getOperand());
+                // negate a0 by subtracting it from zero (0 - a0)
+                out.emitInstruction(RegisterInstruction.SUB, GPRegister.A0, GPRegister.ZERO, GPRegister.A0);
+            } else if (op.getText().equals("!")) {
+                // evaluate the operand (result in a0)
+                generateExpression(unary.getOperand());
+                // if a0 == 0, set a0 to 1. if a0 != 0, set a0 to 0 (set less than immediate unsigned)
+                out.emitInstruction(ImmediateInstruction.SLTIU, GPRegister.A0, GPRegister.A0, 1);
             }
         }
     }
