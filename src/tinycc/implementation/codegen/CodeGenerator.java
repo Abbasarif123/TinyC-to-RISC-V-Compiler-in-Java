@@ -241,6 +241,10 @@ public class CodeGenerator {
             // perform operation t0 has left a0 has right
             if (operator.getKind() == tinycc.parser.TokenKind.PLUS) {
                 out.emitInstruction(RegisterInstruction.ADD, GPRegister.A0, GPRegister.T0, GPRegister.A0);
+            } else if (operator.getKind() == tinycc.parser.TokenKind.MINUS) {
+                out.emitInstruction(RegisterInstruction.SUB, GPRegister.A0, GPRegister.T0, GPRegister.A0);
+            } else if (operator.getKind() == tinycc.parser.TokenKind.ASTERISK) {
+                out.emitInstruction(RegisterInstruction.MUL, GPRegister.A0, GPRegister.T0, GPRegister.A0);
             } else if (operator.getKind() == tinycc.parser.TokenKind.LESS) {
                 out.emitInstruction(RegisterInstruction.SLT, GPRegister.A0, GPRegister.T0, GPRegister.A0);
             } else if (operator.getKind() == tinycc.parser.TokenKind.EQUAL_EQUAL) {

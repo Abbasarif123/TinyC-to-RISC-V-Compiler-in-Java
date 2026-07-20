@@ -17,7 +17,6 @@ public class SemanticAnalyzer {
     public SemanticAnalyzer(Diagnostic diagnostic) {
         this.symbolTable = new SymbolTable();
         this.diagnostic = diagnostic;
-
     }
 
     public void analyze(List<Object> programRoots) {
@@ -30,7 +29,6 @@ public class SemanticAnalyzer {
             } else if (root instanceof FunctionDefinition) {
                 FunctionDefinition func = (FunctionDefinition) root;
                 checkAndInsertGlobal(func.getNameText(), func.getType(), func.getName());
-
             }
         }
 
@@ -43,9 +41,15 @@ public class SemanticAnalyzer {
             }
         }
 
+        // PASS 3
+        // check for main function requirement for complete programs
+        Type mainType = symbolTable.lookup("main");
+        if (mainType == null || !(mainType instanceof tinycc.implementation.type.FunctionType)) {
+            diagnostic.printError(null, "Program must contain a 'main' function.");
+        }
     }
-    // helper method to insert globals and check tinyCrules
 
+    // helper method to insert globals and check tinyCrules
     private void checkAndInsertGlobal(String name, Type type, tinycc.parser.Token locationToken) {
         // rule: variables cannot be of type void
         if (!(type instanceof tinycc.implementation.type.FunctionType) && type.toString().equals("Type_void")) {
@@ -64,7 +68,6 @@ public class SemanticAnalyzer {
             // else its new so insert it into the global scope
             symbolTable.insert(name, type);
         }
-
     }
 
     private void analyzeFunction(FunctionDefinition func) {
@@ -95,10 +98,6 @@ public class SemanticAnalyzer {
             }
         }
 
-        // DOne: recursively walk through the func.getbody() and check statements
-        checkStatement(func.getBody());
-
-        symbolTable.leaveScope();
         this.currentFunctionReturnType = funcType.getReturnType();
 
         // recursivelt walk through the func.getBody() and check the statements
@@ -164,7 +163,6 @@ public class SemanticAnalyzer {
                         diagnostic.printError(decl.getName(), "Type mismatch in declaration. Expected "
                                 + decl.getType().toString() + " but got " + initType.toString());
                     }
-
                 }
             }
 
@@ -310,23 +308,31 @@ public class SemanticAnalyzer {
                 return leftType; // Assignments return the type of their left operand
             }
 
-            // handle math (+)
-            else if (operator.getKind() == tinycc.parser.TokenKind.PLUS) {
-                // int + int = int ie normal addition
+            // handle math (+, -, *, /)
+            else if (operator.getKind() == tinycc.parser.TokenKind.PLUS ||
+                    operator.getKind() == tinycc.parser.TokenKind.MINUS ||
+                    operator.getKind() == tinycc.parser.TokenKind.ASTERISK ||
+                    operator.getKind() == tinycc.parser.TokenKind.SLASH) {
+
+                // int op int = int ie normal math
                 if (leftType.toString().equals("Type_int") && rightType.toString().equals("Type_int")) {
                     return leftType;
                 }
-                // pointer + int = pointer ie pointer artihmetic
+                // pointer +/- int = pointer ie pointer artihmetic
                 else if (leftType instanceof tinycc.implementation.type.PointerType
-                        && rightType.toString().equals("Type_int")) {
+                        && rightType.toString().equals("Type_int")
+                        && (operator.getKind() == tinycc.parser.TokenKind.PLUS
+                                || operator.getKind() == tinycc.parser.TokenKind.MINUS)) {
                     return leftType;
                 }
                 // int + pointer = pointer ie pointer arithemetic but the ther way around
                 else if (leftType.toString().equals("Type_int")
-                        && rightType instanceof tinycc.implementation.type.PointerType) {
+                        && rightType instanceof tinycc.implementation.type.PointerType
+                        && operator.getKind() == tinycc.parser.TokenKind.PLUS) {
                     return rightType;
                 } else {
-                    diagnostic.printError(operator, "Invalid types for addition: " + leftType + " and " + rightType);
+                    diagnostic.printError(operator,
+                            "Invalid types for math operation: " + leftType + " and " + rightType);
                     return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
                 }
             }
@@ -337,7 +343,7 @@ public class SemanticAnalyzer {
                 // comparisons always evaluate to an integer (0 for false, 1 for true)
                 return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
             }
-            // fallback for other operators (maybe check this for later)
+            // fallback for other operators
             return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
 
         } else if (expr instanceof tinycc.implementation.expression.CallExpression) {
@@ -436,7 +442,7 @@ public class SemanticAnalyzer {
                 return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
             }
 
-            // fall back for sizeof and stuff (if its supported by tinyC will check later)
+            // fall back for sizeof and stuff
             return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
 
         }
@@ -468,7 +474,5 @@ public class SemanticAnalyzer {
 
         // numbers strings math eqs and func calls are not lvalues since not Levalable
         return false;
-
     }
-
 }
