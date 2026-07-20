@@ -25,7 +25,7 @@ public class ActivationRecord {
     }
 
     // called when exiting a block
-
+    // comment to check if git push is working
     public void leaveScope() {
         if (!scopes.isEmpty()) {
             scopes.pop();
