@@ -72,7 +72,7 @@ public class SemanticAnalyzer {
         List<Type> paramTypes = funcType.getParameters();
         List<tinycc.parser.Token> paramNames = func.getParameterNames();
 
-        // loop througb and register eacg parmeter
+        // loop through and register eacg parmeter
         for (int i = 0; i < paramNames.size(); i++) {
             Type pType = paramTypes.get(i);
             tinycc.parser.Token pNameToken = paramNames.get(i);
@@ -317,7 +317,7 @@ public class SemanticAnalyzer {
                                 "Type mismatch in assignment. Cannot assign " + rightType + " to " + leftType);
                     }
                 }
-                return leftType; // Assignments return the type of their left operand
+                return leftType; // assignments return the type of their left operand
             }
 
             // handle math (+, -, *, /)
@@ -349,7 +349,7 @@ public class SemanticAnalyzer {
                 }
             }
 
-            // handle comparison operatorrs (eg ==, < , >)
+            // handle comparison operatorrs
             else if (operator.getKind() == tinycc.parser.TokenKind.EQUAL_EQUAL
                     || operator.getKind() == tinycc.parser.TokenKind.LESS) {
                 // comparisons always evaluate to an integer (0 for false, 1 for true)
@@ -400,13 +400,13 @@ public class SemanticAnalyzer {
                     Type paramType = params.get(i);
 
                     if (argType != null && !argType.toString().equals(paramType.toString())) {
-                        // Allow implicit char <-> int promotion
+                        // allow implicit char to int promotion
                         boolean isImplicitCharToInt = paramType.toString().equals("Type_int")
                                 && argType.toString().equals("Type_char");
                         boolean isImplicitIntToChar = paramType.toString().equals("Type_char")
                                 && argType.toString().equals("Type_int");
 
-                        // Allow implicit void* to any pointer
+                        // allow implicit void* to any pointer
                         boolean isVoidPointerCast = paramType instanceof tinycc.implementation.type.PointerType
                                 && argType.toString().equals("Pointer[Type_void]");
 
@@ -432,7 +432,7 @@ public class SemanticAnalyzer {
                 return null;
             }
 
-            // Addressof operator ie &, this creates a pointer
+            // & operator ie this creates a pointer
             if (operator.getText().equals("&")) {
                 // rule:can only take the address of an lvalue (a specific memory location)
                 if (!isLValue(unary.getOperand())) {
@@ -440,7 +440,7 @@ public class SemanticAnalyzer {
                     return new tinycc.implementation.type.PointerType(operandType); // return anyway to prevent
                                                                                     // cascading errors
                 }
-                // taking the address of an 'int' gives you an 'int*'
+                // taking the address of an int gives you an int*
                 return new tinycc.implementation.type.PointerType(operandType);
             }
 
@@ -451,7 +451,7 @@ public class SemanticAnalyzer {
                     diagnostic.printError(operator, "Cannot dereference a non-pointer type: " + operandType);
                     return new tinycc.implementation.type.BaseType(tinycc.parser.TokenKind.INT);
                 }
-                // dereferencing an 'int*' gives you the underlying 'int'
+                // dereferencing an 'nt* gives you the underlying int
                 tinycc.implementation.type.PointerType ptrType = (tinycc.implementation.type.PointerType) operandType;
                 return ptrType.getPointsTo();
             }
@@ -471,7 +471,7 @@ public class SemanticAnalyzer {
     }
 
     // helper
-    // determines if an expression is a valid L-value (can be assigned to)
+    // determines if an expression is a valid Lvalue ie can be assigned to
     private boolean isLValue(tinycc.implementation.expression.Expression expr) {
         if (expr == null) {
             return false;

@@ -17,8 +17,8 @@ public class CodeGenerator {
     private AsmGen out;
     private TextLabel currentEpilogueLabel;
     private ActivationRecord record;
-    private Set<String> intPointers = new HashSet<>(); // BUGFIX: Track int pointers for arithmetic
-    private Map<String, TextLabel> functionLabels = new HashMap<>(); // BUGFIX: Cache function labels to prevent
+    private Set<String> intPointers = new HashSet<>(); // bugfix: rrack int pointers for arithmetic
+    private Map<String, TextLabel> functionLabels = new HashMap<>(); // bugfix: cache function labels to prevent
                                                                      // duplicates
 
     public CodeGenerator(AsmGen out) {
@@ -315,7 +315,7 @@ public class CodeGenerator {
                         scalePointer = true;
                 }
                 if (scalePointer) {
-                    // Shift Left Logical by 2 multiplies A0 by exactly 4
+                    // sift Left logical by 2 multiplies a0 by exactly 4
                     out.emitInstruction(ImmediateInstruction.SLLI, GPRegister.A0, GPRegister.A0, 2);
                 }
                 out.emitInstruction(RegisterInstruction.ADD, GPRegister.A0, GPRegister.T0, GPRegister.A0);
@@ -401,7 +401,7 @@ public class CodeGenerator {
             } else if (op.getText().equals("!")) {
                 // evaluate the operand (result in a0)
                 generateExpression(unary.getOperand());
-                // if a0 == 0, set a0 to 1. if a0 != 0, set a0 to 0 (set less than immediate unsigned)
+                // if a0 == 0, set a0 to 1 if a0 != 0 set a0 to 0 (set less than immediate unsigned) ie sltiu
                 out.emitInstruction(ImmediateInstruction.SLTIU, GPRegister.A0, GPRegister.A0, 1);
             }
         }
