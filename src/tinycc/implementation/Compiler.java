@@ -1,13 +1,16 @@
 package tinycc.implementation;
 
+import tinycc.implementation.codegen.CodeGenerator;
 import tinycc.diagnostic.Diagnostic;
 import tinycc.parser.ASTFactory;
 import tinycc.parser.Lexer;
 import tinycc.parser.Parser;
 import tinycc.logic.Formula;
 import tinycc.asmgen.AsmGen;
+import tinycc.implementation.codegen.CodeGenerator;
 import tinycc.implementation.semantics.SemanticAnalyzer;
 import tinycc.implementation.semantics.SymbolTable;
+import tinycc.asmgen.AsmGen;
 
 /**
  * The main compiler class.
@@ -93,8 +96,16 @@ public class Compiler {
 	 * @remarks This function is invoked only once in each instance of the compiler
 	 *          class. Only necessary if mentioned in the project description.
 	 */
+
 	public void generateCode(final AsmGen out) {
-		throw new UnsupportedOperationException("TODO: implement this");
+		// throw new UnsupportedOperationException("DONE: implement this");
+		// 1. Grab the validated AST ledger
+		ASTFactoryImpl myFactory = (ASTFactoryImpl) this.getASTFactory();
+		java.util.List<Object> astRoots = myFactory.getProgramRoots();
+
+		// 2. Boot up the code generator and pass it the output stream
+		CodeGenerator generator = new CodeGenerator(out);
+		generator.generate(astRoots);
 	}
 
 	/**
