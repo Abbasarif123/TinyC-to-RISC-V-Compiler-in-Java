@@ -4,7 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Stack;
 
-//tracks memory offsets for local variables relative to the frame pointer
+// tracks memory offsets for local variables relative to the frame pointer
 
 public class ActivationRecord {
 

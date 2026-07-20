@@ -49,6 +49,17 @@ public class CodeGenerator {
         // create new epilogue label after func so u know where tojump
         currentEpilogueLabel = out.makeUniqueTextLabel("epilogue_" + funcName);
 
+        // save incoming parameters to the stack
+        List<tinycc.parser.Token> paramNames = func.getParameterNames();
+        for (int i = 0; i < paramNames.size(); i++) {
+            // allocate a stack slot for the parameter
+            int paramOffset = record.allocateLocal(paramNames.get(i).getText());
+            // grab the corresponding argument register
+            GPRegister argReg = GPRegister.valueOf("A" + i);
+            // store the registers value into the new memory slot
+            out.emitInstruction(MemoryInstruction.SW, argReg, null, paramOffset, GPRegister.S0);
+        }
+
         // generate code for the func body
         generateStatement(func.getBody());
 
@@ -87,7 +98,7 @@ public class CodeGenerator {
                 // evaluates expresion and returns the result in a0
                 generateExpression(ret.getExpression());
             }
-            // Jump to the epilogue to clean up the stack and return
+            // jump to the epilogue to clean up the stack and return
             out.emitInstruction(JumpInstruction.J, currentEpilogueLabel);
         } else if (stmt instanceof tinycc.implementation.statement.ExpressionStatement) {
             tinycc.implementation.statement.ExpressionStatement exprStmt = (tinycc.implementation.statement.ExpressionStatement) stmt;
@@ -166,11 +177,11 @@ public class CodeGenerator {
                 // asssuming addi can handle it if it fits in 12 bits, otherwise LUI will be needed
                 out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.A0, GPRegister.ZERO, val);
             } else if (token.getKind() == tinycc.parser.TokenKind.IDENTIFIER) {
-                // Get offset from symbol table memory layout
+                // get offset from symbol table memory layout
                 Integer offset = record.getOffset(token.getText());
 
                 if (offset != null) {
-                    // Load the variable's value from memory into A0
+                    // load the variable's value from memory into A0
                     out.emitInstruction(MemoryInstruction.LW, GPRegister.A0, null, offset, GPRegister.S0);
                 }
             }
@@ -180,17 +191,35 @@ public class CodeGenerator {
 
             // assignments evaluate right to left
             if (operator.getKind() == tinycc.parser.TokenKind.EQUAL) {
-                generateExpression(binOp.getRight());
+                generateExpression(binOp.getRight()); // right side value is now in a0
 
-                // The left side MUST be an identifier
-                tinycc.implementation.expression.PrimaryExpression leftPrimary = (tinycc.implementation.expression.PrimaryExpression) binOp
-                        .getLeft();
+                if (binOp.getLeft() instanceof tinycc.implementation.expression.PrimaryExpression) {
+                    // standard variable assignment
+                    tinycc.implementation.expression.PrimaryExpression leftPrimary = (tinycc.implementation.expression.PrimaryExpression) binOp
+                            .getLeft();
+                    Integer offset = record.getOffset(leftPrimary.getToken().getText());
+                    if (offset != null) {
+                        out.emitInstruction(MemoryInstruction.SW, GPRegister.A0, null, offset, GPRegister.S0);
+                    }
+                } else if (binOp.getLeft() instanceof tinycc.implementation.expression.UnaryExpression) {
+                    // pointer assignment
+                    tinycc.implementation.expression.UnaryExpression leftUnary = (tinycc.implementation.expression.UnaryExpression) binOp
+                            .getLeft();
+                    if (leftUnary.getOperator().getText().equals("*")) {
+                        // push right side to the stack temporarily
+                        out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.SP, GPRegister.SP, -4);
+                        out.emitInstruction(MemoryInstruction.SW, GPRegister.A0, null, 0, GPRegister.SP);
 
-                Integer offset = record.getOffset(leftPrimary.getToken().getText());
+                        // evaluate the pointer address goes into a0
+                        generateExpression(leftUnary.getOperand());
 
-                // store A0 into the correct offset
-                if (offset != null) {
-                    out.emitInstruction(MemoryInstruction.SW, GPRegister.A0, null, offset, GPRegister.S0);
+                        // pop the right side value back into t0
+                        out.emitInstruction(MemoryInstruction.LW, GPRegister.T0, null, 0, GPRegister.SP);
+                        out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.SP, GPRegister.SP, 4);
+
+                        // store the value into the address
+                        out.emitInstruction(MemoryInstruction.SW, GPRegister.T0, null, 0, GPRegister.A0);
+                    }
                 }
                 return;
             }
@@ -244,6 +273,26 @@ public class CodeGenerator {
 
             // return value naturally sits in A0 after the call returns which aligns perfectly with our stack
 
+        } else if (expr instanceof tinycc.implementation.expression.UnaryExpression) {
+            tinycc.implementation.expression.UnaryExpression unary = (tinycc.implementation.expression.UnaryExpression) expr;
+            tinycc.parser.Token op = unary.getOperator();
+
+            if (op.getText().equals("&")) {
+                // get the offset of the variable
+                tinycc.implementation.expression.PrimaryExpression primary = (tinycc.implementation.expression.PrimaryExpression) unary
+                        .getOperand();
+                Integer offset = record.getOffset(primary.getToken().getText());
+
+                // calculate the exact memory address and store it in a0
+                if (offset != null) {
+                    out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.A0, GPRegister.S0, offset);
+                }
+            } else if (op.getText().equals("*")) {
+                // evaluate the pointer expression the address will end up in a0
+                generateExpression(unary.getOperand());
+                // load the actual value from that address
+                out.emitInstruction(MemoryInstruction.LW, GPRegister.A0, null, 0, GPRegister.A0);
+            }
         }
     }
 }
