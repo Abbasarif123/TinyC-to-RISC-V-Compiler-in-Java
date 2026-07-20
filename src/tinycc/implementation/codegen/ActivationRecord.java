@@ -13,8 +13,9 @@ public class ActivationRecord {
 
     public ActivationRecord() {
         this.scopes = new Stack<>();
+        // bugfix remove the 8 bytes needed by ra and s0 will be skiped
         // start at 0 and move in negative offsets of 4
-        this.currentOffset = 0;
+        this.currentOffset = -8;
         enterScope();
     }
 
