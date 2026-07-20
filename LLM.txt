@@ -1,8 +1,0 @@
-//final code
-
-//i used the free version of gemini aka gemini flash mostly for helping me understand the logic behind the mechansims i was supposed to implement
-also used it for bug fixing, this time i could find quite a few big glaring logical issues in my implementation so after running public tests. last time i hadnt run public tests i just git pushed due to time constraints. 
-but i just checked the semantics tests didnt pass so i used ai to help me fix that
-as long as phase 3a was quite long and its been in the works for a few days and i used ai throughout this process by first giving it my logic, then seeing if it can point out some issues in my thinking. then repeat until i reach
-a proper bugfree process logic. then after coding and running public tests, testfactorial and testcal got stuck and i couldnt get it so i had ai help me understand and give me the fixes. i found phase 3 quite tough so ai was used
-quite alot to explain concepts and fix code and give me suggestions of where im going wrong.
