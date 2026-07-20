@@ -40,13 +40,6 @@ public class SemanticAnalyzer {
                 analyzeFunction(func);
             }
         }
-
-        // PASS 3
-        // check for main function requirement for complete programs
-        Type mainType = symbolTable.lookup("main");
-        if (mainType == null || !(mainType instanceof tinycc.implementation.type.FunctionType)) {
-            diagnostic.printError(null, "Program must contain a 'main' function.");
-        }
     }
 
     // helper method to insert globals and check tinyCrules
@@ -155,11 +148,17 @@ public class SemanticAnalyzer {
 
                 // strict exact math check for now
                 if (initType != null && !initType.toString().equals(decl.getType().toString())) {
-                    // implicit char to int
+                    // implicit char to int and int to char
                     boolean isImplicitCharToInt = decl.getType().toString().equals("Type_int")
                             && initType.toString().equals("Type_char");
+                    boolean isImplicitIntToChar = decl.getType().toString().equals("Type_char")
+                            && initType.toString().equals("Type_int");
 
-                    if (!isImplicitCharToInt) {
+                    // implicit void* to any pointer
+                    boolean isVoidPointerCast = decl.getType() instanceof tinycc.implementation.type.PointerType
+                            && initType.toString().equals("Pointer[Type_void]");
+
+                    if (!isImplicitCharToInt && !isImplicitIntToChar && !isVoidPointerCast) {
                         diagnostic.printError(decl.getName(), "Type mismatch in declaration. Expected "
                                 + decl.getType().toString() + " but got " + initType.toString());
                     }
@@ -185,11 +184,17 @@ public class SemanticAnalyzer {
                 if (currentFunctionReturnType != null && actualRetType != null) {
                     if (!actualRetType.toString().equals(currentFunctionReturnType.toString())) {
 
-                        // Allow implicit char -> int conversion
+                        // Allow implicit char <-> int conversion
                         boolean isImplicitCharToInt = currentFunctionReturnType.toString().equals("Type_int")
                                 && actualRetType.toString().equals("Type_char");
+                        boolean isImplicitIntToChar = currentFunctionReturnType.toString().equals("Type_char")
+                                && actualRetType.toString().equals("Type_int");
 
-                        if (!isImplicitCharToInt) {
+                        // Allow implicit void* to any pointer
+                        boolean isVoidPointerCast = currentFunctionReturnType instanceof tinycc.implementation.type.PointerType
+                                && actualRetType.toString().equals("Pointer[Type_void]");
+
+                        if (!isImplicitCharToInt && !isImplicitIntToChar && !isVoidPointerCast) {
                             diagnostic.printError(null, "Return type mismatch. Expected "
                                     + currentFunctionReturnType.toString() + " but got " + actualRetType.toString());
                         }
@@ -296,11 +301,18 @@ public class SemanticAnalyzer {
                             "Left side of assignment must be a variable or a dereferenced pointer.");
                 }
 
-                // check type compatibility (allowing implicit char to int conversion)
+                // check type compatibility (allowing implicit char <-> int conversion)
                 if (!leftType.toString().equals(rightType.toString())) {
                     boolean isImplicitCharToInt = leftType.toString().equals("Type_int")
                             && rightType.toString().equals("Type_char");
-                    if (!isImplicitCharToInt) {
+                    boolean isImplicitIntToChar = leftType.toString().equals("Type_char")
+                            && rightType.toString().equals("Type_int");
+
+                    // implicit void* to any pointer
+                    boolean isVoidPointerCast = leftType instanceof tinycc.implementation.type.PointerType
+                            && rightType.toString().equals("Pointer[Type_void]");
+
+                    if (!isImplicitCharToInt && !isImplicitIntToChar && !isVoidPointerCast) {
                         diagnostic.printError(operator,
                                 "Type mismatch in assignment. Cannot assign " + rightType + " to " + leftType);
                     }
@@ -388,10 +400,17 @@ public class SemanticAnalyzer {
                     Type paramType = params.get(i);
 
                     if (argType != null && !argType.toString().equals(paramType.toString())) {
-                        // Allow implicit char -> int promotion
+                        // Allow implicit char <-> int promotion
                         boolean isImplicitCharToInt = paramType.toString().equals("Type_int")
                                 && argType.toString().equals("Type_char");
-                        if (!isImplicitCharToInt) {
+                        boolean isImplicitIntToChar = paramType.toString().equals("Type_char")
+                                && argType.toString().equals("Type_int");
+
+                        // Allow implicit void* to any pointer
+                        boolean isVoidPointerCast = paramType instanceof tinycc.implementation.type.PointerType
+                                && argType.toString().equals("Pointer[Type_void]");
+
+                        if (!isImplicitCharToInt && !isImplicitIntToChar && !isVoidPointerCast) {
                             diagnostic.printError(funcToken, "Argument " + (i + 1) + " type mismatch. Expected "
                                     + paramType + " but got " + argType);
                         }

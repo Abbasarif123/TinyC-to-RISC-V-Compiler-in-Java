@@ -1,6 +1,10 @@
 package tinycc.implementation.codegen;
 
 import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.Map;
+import java.util.HashMap;
 import tinycc.asmgen.*;
 import tinycc.implementation.declaration.FunctionDefinition;
 import tinycc.implementation.statement.Statement;
@@ -13,18 +17,76 @@ public class CodeGenerator {
     private AsmGen out;
     private TextLabel currentEpilogueLabel;
     private ActivationRecord record;
+    private Set<String> intPointers = new HashSet<>(); // BUGFIX: Track int pointers for arithmetic
+    private Map<String, TextLabel> functionLabels = new HashMap<>(); // BUGFIX: Cache function labels to prevent
+                                                                     // duplicates
 
     public CodeGenerator(AsmGen out) {
         this.out = out;
     }
 
+    // helper method to ensure we only create one label per function name
+    private TextLabel getFunctionLabel(String name) {
+        if (!functionLabels.containsKey(name)) {
+            functionLabels.put(name, out.makeTextLabel(name));
+        }
+        return functionLabels.get(name);
+    }
+
     // main entry point for code generation.
 
     public void generate(List<Object> programRoots) {
+        // PASS 1: scan for global int pointers to handle pointer math scaling
+        for (Object root : programRoots) {
+            if (root instanceof tinycc.implementation.declaration.ExternalDeclaration) {
+                tinycc.implementation.declaration.ExternalDeclaration decl = (tinycc.implementation.declaration.ExternalDeclaration) root;
+                if (decl.getType().toString().equals("Pointer[Type_int]")) {
+                    intPointers.add(decl.getNameText());
+                }
+            } else if (root instanceof FunctionDefinition) {
+                FunctionDefinition func = (FunctionDefinition) root;
+                if (func.getType() instanceof tinycc.implementation.type.FunctionType) {
+                    tinycc.implementation.type.FunctionType fType = (tinycc.implementation.type.FunctionType) func
+                            .getType();
+                    List<tinycc.implementation.type.Type> pTypes = fType.getParameters();
+                    List<tinycc.parser.Token> pNames = func.getParameterNames();
+                    for (int i = 0; i < pNames.size(); i++) {
+                        if (pTypes.get(i).toString().equals("Pointer[Type_int]")) {
+                            intPointers.add(pNames.get(i).getText());
+                        }
+                    }
+                }
+            }
+        }
+
         for (Object root : programRoots) {
             if (root instanceof FunctionDefinition) {
                 generateFunction((FunctionDefinition) root);
             }
+        }
+    }
+
+    // helper method to safely grab a registers without relying on string reflection
+    private GPRegister getArgRegister(int index) {
+        switch (index) {
+            case 0:
+                return GPRegister.A0;
+            case 1:
+                return GPRegister.A1;
+            case 2:
+                return GPRegister.A2;
+            case 3:
+                return GPRegister.A3;
+            case 4:
+                return GPRegister.A4;
+            case 5:
+                return GPRegister.A5;
+            case 6:
+                return GPRegister.A6;
+            case 7:
+                return GPRegister.A7;
+            default:
+                throw new RuntimeException("Too many arguments");
         }
     }
 
@@ -33,8 +95,8 @@ public class CodeGenerator {
 
         this.record = new ActivationRecord();
 
-        // the function label
-        TextLabel funcLabel = out.makeTextLabel(funcName);
+        // the function label (using the cache to prevent duplicates)
+        TextLabel funcLabel = getFunctionLabel(funcName);
         out.emitLabel(funcLabel);
 
         // set up the stack frame (storing)
@@ -54,8 +116,8 @@ public class CodeGenerator {
         for (int i = 0; i < paramNames.size(); i++) {
             // allocate a stack slot for the parameter
             int paramOffset = record.allocateLocal(paramNames.get(i).getText());
-            // grab the corresponding argument register
-            GPRegister argReg = GPRegister.valueOf("A" + i);
+            // grab the corresponding argument register safely
+            GPRegister argReg = getArgRegister(i);
             // store the registers value into the new memory slot
             out.emitInstruction(MemoryInstruction.SW, argReg, null, paramOffset, GPRegister.S0);
         }
@@ -150,6 +212,11 @@ public class CodeGenerator {
         } else if (stmt instanceof tinycc.implementation.statement.DeclarationStatement) {
             tinycc.implementation.statement.DeclarationStatement decl = (tinycc.implementation.statement.DeclarationStatement) stmt;
 
+            // BUGFIX: keep track of local int pointers for scaling
+            if (decl.getType().toString().equals("Pointer[Type_int]")) {
+                intPointers.add(decl.getName().getText());
+            }
+
             // allocate space on the stack for this new variable
             int offset = record.allocateLocal(decl.getName().getText());
 
@@ -174,7 +241,6 @@ public class CodeGenerator {
             if (token.getKind() == tinycc.parser.TokenKind.NUMBER) {
                 int val = Integer.parseInt(token.getText());
                 // load immediate value into return register A0
-                // asssuming addi can handle it if it fits in 12 bits, otherwise LUI will be needed
                 out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.A0, GPRegister.ZERO, val);
             } else if (token.getKind() == tinycc.parser.TokenKind.IDENTIFIER) {
                 // get offset from symbol table memory layout
@@ -240,39 +306,70 @@ public class CodeGenerator {
 
             // perform operation t0 has left a0 has right
             if (operator.getKind() == tinycc.parser.TokenKind.PLUS) {
+                // BUGFIX: Check if left side is an int* so we can scale the integer by 4
+                boolean scalePointer = false;
+                if (binOp.getLeft() instanceof tinycc.implementation.expression.PrimaryExpression) {
+                    String leftName = ((tinycc.implementation.expression.PrimaryExpression) binOp.getLeft()).getToken()
+                            .getText();
+                    if (intPointers.contains(leftName))
+                        scalePointer = true;
+                }
+                if (scalePointer) {
+                    // Shift Left Logical by 2 multiplies A0 by exactly 4
+                    out.emitInstruction(ImmediateInstruction.SLLI, GPRegister.A0, GPRegister.A0, 2);
+                }
                 out.emitInstruction(RegisterInstruction.ADD, GPRegister.A0, GPRegister.T0, GPRegister.A0);
             } else if (operator.getKind() == tinycc.parser.TokenKind.MINUS) {
+                boolean scalePointer = false;
+                if (binOp.getLeft() instanceof tinycc.implementation.expression.PrimaryExpression) {
+                    String leftName = ((tinycc.implementation.expression.PrimaryExpression) binOp.getLeft()).getToken()
+                            .getText();
+                    if (intPointers.contains(leftName))
+                        scalePointer = true;
+                }
+                if (scalePointer) {
+                    out.emitInstruction(ImmediateInstruction.SLLI, GPRegister.A0, GPRegister.A0, 2);
+                }
                 out.emitInstruction(RegisterInstruction.SUB, GPRegister.A0, GPRegister.T0, GPRegister.A0);
             } else if (operator.getKind() == tinycc.parser.TokenKind.ASTERISK) {
                 out.emitInstruction(RegisterInstruction.MUL, GPRegister.A0, GPRegister.T0, GPRegister.A0);
             } else if (operator.getKind() == tinycc.parser.TokenKind.LESS) {
                 out.emitInstruction(RegisterInstruction.SLT, GPRegister.A0, GPRegister.T0, GPRegister.A0);
             } else if (operator.getKind() == tinycc.parser.TokenKind.EQUAL_EQUAL) {
-                // subbtract the two values if they were equal the result is 0
+                // subtract the two values if they were equal the result is 0
                 out.emitInstruction(RegisterInstruction.SUB, GPRegister.A0, GPRegister.T0, GPRegister.A0);
                 // we need to set A0 to 1 if a0 == 0
                 out.emitInstruction(ImmediateInstruction.SLTIU, GPRegister.A0, GPRegister.A0, 1);
+            } else if (operator.getText().equals("!=")) {
+                // subtract the two values. if they are not equal, the result is non-zero
+                out.emitInstruction(RegisterInstruction.SUB, GPRegister.A0, GPRegister.T0, GPRegister.A0);
+                // sltu a0, zero, a0 sets a0 to 1 if a0 > 0 (not equal)
+                out.emitInstruction(RegisterInstruction.SLTU, GPRegister.A0, GPRegister.ZERO, GPRegister.A0);
             }
         } else if (expr instanceof tinycc.implementation.expression.CallExpression) {
             tinycc.implementation.expression.CallExpression call = (tinycc.implementation.expression.CallExpression) expr;
 
-            // evaluate arguments and push them to argument registers a0 to a7
             List<Expression> args = call.getArguments();
+
+            // evaluate all arguments and push them to the stack to prevent clobbering a0
             for (int i = 0; i < args.size(); i++) {
                 generateExpression(args.get(i));
-
-                // map a0 to the correct argument register
-                GPRegister targetArgReg = GPRegister.valueOf("A" + i);
-                if (i != 0) { // no need to move if its already in a0
-                    // move instruction is inherently aaddi target, a0, 0
-                    out.emitInstruction(ImmediateInstruction.ADDI, targetArgReg, GPRegister.A0, 0);
-                }
+                out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.SP, GPRegister.SP, -4);
+                out.emitInstruction(MemoryInstruction.SW, GPRegister.A0, null, 0, GPRegister.SP);
             }
 
-            // extract function name and emit call
+            // pop them into their respective argument registers in reverse order
+            for (int i = args.size() - 1; i >= 0; i--) {
+                GPRegister targetArgReg = getArgRegister(i);
+                out.emitInstruction(MemoryInstruction.LW, targetArgReg, null, 0, GPRegister.SP);
+                out.emitInstruction(ImmediateInstruction.ADDI, GPRegister.SP, GPRegister.SP, 4);
+            }
+
+            // extract function name and emit call using the label cache
             tinycc.implementation.expression.PrimaryExpression callee = (tinycc.implementation.expression.PrimaryExpression) call
                     .getCallee();
-            TextLabel funcTarget = out.makeTextLabel(callee.getToken().getText());
+            String targetName = callee.getToken().getText();
+            TextLabel funcTarget = getFunctionLabel(targetName);
             out.emitInstruction(JumpInstruction.JAL, funcTarget);
 
             // return value naturally sits in A0 after the call returns which aligns perfectly with our stack
